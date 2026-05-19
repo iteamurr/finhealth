@@ -1,90 +1,136 @@
 # FinHealth SMB
 
-Financial health analyzer for sellers on Russian marketplaces (Wildberries, Ozon). Aggregates sales, commissions, returns, logistics costs, and ad spend to produce P&L, cash flow (ДДС), unit economics per SKU, and automated alerts for loss-making SKUs, margin drops, and cash gaps. MVP runs on mock seeded data only.
+Анализатор финансового здоровья для продавцов на Wildberries и Ozon. Агрегирует продажи, комиссии, возвраты, логистику и рекламные расходы — и формирует P&L, ДДС, юнит-экономику по SKU и автоматические алерты на убыточные SKU, падение маржи и кассовые разрывы. MVP работает на тестовых данных без реальных API-запросов.
 
-## Prerequisites
+## Требования
 
 - Docker
 - Docker Compose v2
 
-## Quick start
+## Быстрый старт
 
 ```bash
-# 1. Clone the repository
+# 1. Клонировать репозиторий
 git clone <repo-url>
 cd finhealth
 
-# 2. Copy environment template
+# 2. Создать .env из шаблона
 cp .env.example .env
 
-# 3. Build and start the stack (Postgres + app)
+# 3. Собрать и запустить стек (Postgres + API + Streamlit)
 docker compose up -d --build
 
-# 4. Apply database migrations
+# 4. Применить миграции
 docker compose exec app alembic upgrade head
 
-# 5. Load seed data (20 SKUs, 30 days of orders, returns, cash flow)
+# 5. Загрузить тестовые данные (20 SKU, 30 дней, возвраты, ДДС)
 docker compose exec app python -m finhealth.infrastructure.seed.seed
 
-# 6. Verify the API is up
+# 6. Проверить API
 curl -s localhost:8000/api/v1/health | python -m json.tool
 ```
 
-API docs are available at `http://localhost:8000/docs`.
+- API: `http://localhost:8000` — документация по адресу `/docs`
+- Дашборд: `http://localhost:8501`
 
-## Running seed data separately
+## Пересев данных
 
-The seed script is idempotent for an empty database. To re-seed, drop and recreate the schema first.
+Скрипт не идемпотентен при повторном запуске. Для полного пересева:
 
 ```bash
-# Re-seed (requires an empty schema)
 docker compose exec app alembic downgrade base
 docker compose exec app alembic upgrade head
 docker compose exec app python -m finhealth.infrastructure.seed.seed
 ```
 
-Seed output guarantees at least three loss-making SKUs and one cash gap > 7 days to demonstrate alerts.
+Сид гарантирует: минимум 3 убыточных SKU и один кассовый разрыв > 7 дней для демонстрации алертов.
 
-## Endpoint reference
-
-All endpoints live under `/api/v1`. Date query params accept `YYYY-MM-DD`. Date range is validated: `from_date <= to_date` and span <= 90 days.
-
-| Method | Path | Description | Query params |
-|---|---|---|---|
-| GET | `/api/v1/health` | DB ping; returns 503 if Postgres is unreachable | none |
-| GET | `/api/v1/dashboard` | Aggregated summary (revenue, profit, alerts count) | `from_date`, `to_date` |
-| GET | `/api/v1/pnl` | Profit and loss breakdown, optionally filtered by marketplace | `from_date`, `to_date`, `marketplace` (optional: `WB` or `OZON`) |
-| GET | `/api/v1/unit-economics` | Per-SKU revenue, costs, profit, margin, ROI | `from_date`, `to_date` |
-| GET | `/api/v1/cashflow` | Daily cash flow timeline with gap detection | `from_date`, `to_date` |
-| GET | `/api/v1/alerts` | Loss / low-margin / cash-gap alerts | `from_date`, `to_date` |
-
-### Validation errors
-
-- `from_date > to_date` -> HTTP 422 `{"detail": "from_date must be <= to_date"}`
-- range > 90 days -> HTTP 422 `{"detail": "Date range cannot exceed 90 days"}`
-
-## Running tests
+## Тесты
 
 ```bash
-# Inside the container
+# Запустить все тесты
 docker compose exec app pytest
 
-# With coverage on the domain layer
+# С покрытием доменного слоя
 docker compose exec app pytest --cov=finhealth/domain tests/domain
 ```
 
-## Project layout
+---
+
+## Бэкенд (FastAPI)
+
+### Эндпоинты
+
+Все маршруты под `/api/v1`. Даты принимаются в формате `YYYY-MM-DD`. Диапазон: `from_date <= to_date`, максимум 90 дней.
+
+| Метод | Путь | Описание | Параметры |
+|---|---|---|---|
+| GET | `/api/v1/health` | Пинг БД; 503 если Postgres недоступен | — |
+| GET | `/api/v1/dashboard` | Сводка: выручка, прибыль, кол-во алертов | `from_date`, `to_date` |
+| GET | `/api/v1/pnl` | P&L с разбивкой по категориям затрат | `from_date`, `to_date`, `marketplace` (опц.: `WB` или `OZON`) |
+| GET | `/api/v1/unit-economics` | Юнит-экономика по каждому SKU | `from_date`, `to_date` |
+| GET | `/api/v1/cashflow` | ДДС с детекцией кассовых разрывов | `from_date`, `to_date` |
+| GET | `/api/v1/alerts` | Алерты: убытки, низкая маржа, разрывы | `from_date`, `to_date` |
+
+### Ошибки валидации
+
+- `from_date > to_date` → HTTP 422 `{"detail": "from_date must be <= to_date"}`
+- диапазон > 90 дней → HTTP 422 `{"detail": "Date range cannot exceed 90 days"}`
+
+### Структура бэкенда
 
 ```
 finhealth/
-├── domain/           # Pure Python entities, value objects, financial engine
-├── use_cases/        # One class per use case, orchestrates DAOs + domain
-├── infrastructure/   # SQLAlchemy models, DAOs, seed data
-├── presentation/     # FastAPI routers, Pydantic schemas, DI wiring
-├── container.py      # punq DI container
-└── main.py           # FastAPI app factory
+├── domain/           # Чистый Python: сущности, value objects, финансовый движок
+├── use_cases/        # Один класс — один use case, оркестрирует DAO + домен
+├── infrastructure/   # SQLAlchemy модели, DAO, сид
+├── presentation/     # FastAPI роутеры, Pydantic схемы, DI
+├── container.py      # DI-контейнер punq
+└── main.py           # Фабрика FastAPI-приложения
 ```
 
-## Stack
+**Стек:** FastAPI, SQLAlchemy 2.0 async, asyncpg, PostgreSQL 16, Alembic, Pydantic v2, punq, Faker, pytest.
 
-FastAPI, SQLAlchemy 2.0 async, asyncpg, PostgreSQL 16, Alembic, Pydantic v2, punq, Faker, pytest.
+---
+
+## Фронтенд (Streamlit)
+
+Дашборд для владельца бизнеса. Читает данные из FastAPI и отображает на пяти страницах.
+
+### Страницы
+
+- **Dashboard** — ключевые метрики, динамика прибыли, топ SKU
+- **P&L** — стэковая диаграмма и таблица разбивки по затратам
+- **Unit economics** — карточки SKU с водопадным графиком
+- **Cash flow** — таймлайн выплат, предупреждения о разрывах
+- **Alerts** — лента алертов по приоритету
+
+### Запуск отдельно от Docker
+
+Требование: бэкенд запущен на `http://localhost:8000`.
+
+```bash
+pip install -r streamlit_app/requirements.txt
+streamlit run streamlit_app/main.py
+```
+
+Открыть: `http://localhost:8501`.
+
+### Переменные окружения
+
+| Переменная | По умолчанию | Описание |
+|---|---|---|
+| `API_BASE_URL` | `http://localhost:8000/api/v1` | Адрес FastAPI бэкенда |
+
+Внутри Docker Compose `API_BASE_URL` автоматически устанавливается в `http://app:8000/api/v1`.
+
+### Структура фронтенда
+
+```
+streamlit_app/
+├── main.py         # точка входа, сайдбар, session state
+├── config.py       # настройки и цветовая палитра
+├── client/         # FinHealthClient на httpx (с кешированием)
+├── components/     # metric_card, charts, alert_badge
+└── pages/          # пять страниц Streamlit
+```
