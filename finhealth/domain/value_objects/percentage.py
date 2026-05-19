@@ -14,13 +14,13 @@ class Percentage:
 
     @classmethod
     def from_ratio(cls, ratio: Decimal) -> Percentage:
-        # Ratio is already in 0..1 space, store as-is
+        # ratio уже в диапазоне 0..1, сохраняем как есть
         if not isinstance(ratio, Decimal):
             ratio = Decimal(str(ratio))
         return cls(ratio)
 
     def display(self) -> Decimal:
-        # Return percent form rounded to 2dp
+        # возвращает значение в процентах, округленное до 2 знаков
         return (self.value * Decimal("100")).quantize(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )

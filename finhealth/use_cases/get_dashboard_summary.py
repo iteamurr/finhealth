@@ -95,7 +95,7 @@ class GetDashboardSummaryUseCase:
     def _build_daily_profits(
         orders: list[Any], returns: list[Any]
     ) -> list[dict[str, Any]]:
-        # date -> marketplace -> running profit
+        # дата -> маркетплейс -> накопленная прибыль
         bucket: dict[date, dict[str, Decimal]] = defaultdict(
             lambda: defaultdict(lambda: Decimal("0"))
         )

@@ -73,7 +73,7 @@ def _money(value: Decimal | float | int) -> Decimal:
 
 
 def _pick_categories(fake: Faker) -> tuple[list[str], set[int]]:
-    # 6 fashion SKUs out of 20 total, split across both marketplaces
+    # 6 фэшн-SKU из 20, распределены по обоим маркетплейсам
     total = SKUS_PER_MARKETPLACE * len(MARKETPLACES)
     indices = list(range(total))
     random.shuffle(indices)
@@ -109,7 +109,7 @@ def _build_skus(fake: Faker) -> tuple[list[SKUEntity], set[str], list[str]]:
                 fashion_sku_ids.add(sku_id)
             idx += 1
 
-    # Pick loss-making SKUs deterministically: take 3 random ones, raise their COGS
+    # выбираем 3 убыточных SKU случайно и поднимаем их себестоимость
     all_ids = [s.sku_id for s in skus]
     random.shuffle(all_ids)
     loss_making_ids = all_ids[:LOSS_MAKING_SKU_COUNT]
@@ -132,7 +132,7 @@ def _generate_orders(
             n_orders = random.randint(*ORDERS_PER_DAY_RANGE)
             for _ in range(n_orders):
                 sku = random.choice(skus_by_market[marketplace])
-                # Revenue centered around cost_of_goods * markup
+                # выручка около cost_of_goods * наценка
                 markup = Decimal(str(random.uniform(1.8, 3.2)))
                 revenue = _money(sku.cost_of_goods * markup)
                 commission_rate = Decimal(str(random.uniform(*COMMISSION_RATE_RANGE)))
@@ -169,7 +169,7 @@ def _generate_returns(
             rate = random.uniform(*NON_FASHION_RETURN_RATE)
         if random.random() < rate:
             counter += 1
-            # Return happens 1-7 days after sale
+            # возврат происходит через 1-7 дней после продажи
             return_date = order.sale_date + timedelta(days=random.randint(1, 7))
             returns.append(
                 ReturnEntity(
@@ -188,7 +188,7 @@ def _generate_cashflow(
     returns: list[ReturnEntity],
     today: date,
 ) -> list[CashFlowEntry]:
-    # Index orders and returns by marketplace and week
+    # индексируем заказы и возвраты по маркетплейсу и неделе
     start_date = today - timedelta(days=DAYS_BACK - 1)
     entries: list[CashFlowEntry] = []
 
@@ -204,7 +204,7 @@ def _generate_cashflow(
         key = (ret.marketplace, _week_index(ret.return_date))
         weekly_net[key] = weekly_net.get(key, Decimal("0")) - ret.amount
 
-    # Weekly payouts (positive) scheduled at end of each week
+    # еженедельные выплаты (положительные) в конце каждой недели
     sorted_keys = sorted(weekly_net.keys(), key=lambda k: (k[1], k[0]))
     for marketplace, week in sorted_keys:
         payout_date = start_date + timedelta(days=week * 7 + 6)
@@ -230,7 +230,7 @@ def _generate_cashflow(
                 )
             )
 
-    # Occasional fee charges (negative) sprinkled across the period
+    # редкие комиссионные списания (отрицательные) в течение периода
     for marketplace in MARKETPLACES:
         n_fees = random.randint(2, 4)
         for _ in range(n_fees):
@@ -255,7 +255,7 @@ def _force_loss_making(
     returns: list[ReturnEntity],
     loss_making_sku_ids: list[str],
 ) -> None:
-    # Compute per-SKU revenue/cost components and raise cost_of_goods until profit < 0
+    # считаем компоненты выручки/затрат по SKU и поднимаем cost_of_goods до убытка
     by_sku: dict[str, dict[str, Decimal]] = {}
     for sku in skus:
         by_sku[sku.sku_id] = {
@@ -284,7 +284,7 @@ def _force_loss_making(
         if units == 0:
             sku.cost_of_goods = _money(Decimal("5000"))
             continue
-        # profit_excl_cogs = revenue - commissions - logistics - returns - ad_spend
+        # прибыль без учета себестоимости = выручка - комиссии - логистика - возвраты - реклама
         profit_excl_cogs = (
             agg["revenue"]
             - agg["commissions"]
@@ -292,7 +292,7 @@ def _force_loss_making(
             - agg["returns"]
             - agg["ad_spend"]
         )
-        # We need cost_of_goods * units > profit_excl_cogs (cogs is per unit)
+        # нужно cost_of_goods * units > profit_excl_cogs (cogs — за единицу)
         min_cogs = profit_excl_cogs / units
         new_cogs = _money(min_cogs + Decimal(random.randint(80, 250)))
         if new_cogs <= 0:

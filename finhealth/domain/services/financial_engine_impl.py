@@ -67,7 +67,7 @@ class DefaultFinancialEngine(FinancialEngine):
         total_ad_spend = sum((o.ad_spend for o in orders), Decimal("0"))
         total_returns = sum((r.amount for r in returns), Decimal("0"))
 
-        # COGS proxy: cost_of_goods per order based on SKU lookup
+        # себестоимость: cost_of_goods на заказ по таблице SKU
         sku_cost_map = {s.sku_id: s.cost_of_goods for s in skus}
         total_cogs = sum(
             (sku_cost_map.get(o.sku_id, Decimal("0")) for o in orders),

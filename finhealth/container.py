@@ -41,17 +41,17 @@ from finhealth.use_cases.get_unit_economics import GetUnitEconomicsUseCase
 def build_container(session: AsyncSession) -> punq.Container:
     container = punq.Container()
 
-    # Session — fresh instance per container build (per request)
+    # сессия — новый экземпляр на каждый запрос
     container.register(AsyncSession, instance=session)
 
-    # Domain services
+    # доменные сервисы
     container.register(
         FinancialEngine,
         factory=DefaultFinancialEngine,
         scope=punq.Scope.singleton,
     )
 
-    # DAOs — bind abstract interfaces to SqlAlchemy implementations
+    # DAO — связываем абстрактные интерфейсы с реализациями SqlAlchemy
     container.register(
         SKURepository,
         factory=lambda: SqlAlchemySKURepository(session),
@@ -69,7 +69,7 @@ def build_container(session: AsyncSession) -> punq.Container:
         factory=lambda: SqlAlchemyCashFlowRepository(session),
     )
 
-    # Use cases
+    # юзкейсы
     container.register(GetDashboardSummaryUseCase)
     container.register(GetProfitLossUseCase)
     container.register(GetUnitEconomicsUseCase)
