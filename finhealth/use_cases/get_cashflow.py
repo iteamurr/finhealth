@@ -22,14 +22,14 @@ class CashFlowDTO:
     gaps: list[dict[str, Any]] = field(default_factory=list)
 
 
+@dataclass
 class GetCashFlowUseCase:
-    def __init__(self, cashflow_repo: CashFlowRepository) -> None:
-        self._cashflow_repo = cashflow_repo
+    cashflow_repo: CashFlowRepository
 
     async def execute(
         self, from_date: date, to_date: date
     ) -> CashFlowDTO:
-        entries = await self._cashflow_repo.find_by_date_range(
+        entries = await self.cashflow_repo.find_by_date_range(
             from_date, to_date
         )
 

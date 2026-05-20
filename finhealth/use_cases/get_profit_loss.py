@@ -26,18 +26,12 @@ class ProfitLossDTO:
     total_cogs: Decimal
 
 
+@dataclass
 class GetProfitLossUseCase:
-    def __init__(
-        self,
-        sku_repo: SKURepository,
-        order_repo: OrderRepository,
-        return_repo: ReturnRepository,
-        engine: FinancialEngine,
-    ) -> None:
-        self._sku_repo = sku_repo
-        self._order_repo = order_repo
-        self._return_repo = return_repo
-        self._engine = engine
+    sku_repo: SKURepository
+    order_repo: OrderRepository
+    return_repo: ReturnRepository
+    engine: FinancialEngine
 
     async def execute(
         self,
@@ -45,20 +39,16 @@ class GetProfitLossUseCase:
         to_date: date,
         marketplace: str | None,
     ) -> ProfitLossDTO:
-        skus = await self._sku_repo.find_all()
-        orders = await self._order_repo.find_by_date_range(
-            from_date, to_date
-        )
-        returns = await self._return_repo.find_by_date_range(
-            from_date, to_date
-        )
+        skus = await self.sku_repo.find_all()
+        orders = await self.order_repo.find_by_date_range(from_date, to_date)
+        returns = await self.return_repo.find_by_date_range(from_date, to_date)
 
         if marketplace is not None:
             orders = [o for o in orders if o.marketplace == marketplace]
             returns = [r for r in returns if r.marketplace == marketplace]
             skus = [s for s in skus if s.marketplace == marketplace]
 
-        pnl = self._engine.compute_pnl(orders, returns, skus)
+        pnl = self.engine.compute_pnl(orders, returns, skus)
 
         return ProfitLossDTO(
             gross_profit=pnl["gross_profit"],

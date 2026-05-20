@@ -30,33 +30,22 @@ class DashboardSummaryDTO:
     daily_profits: list[dict[str, Any]] = field(default_factory=list)
 
 
+@dataclass
 class GetDashboardSummaryUseCase:
-    def __init__(
-        self,
-        sku_repo: SKURepository,
-        order_repo: OrderRepository,
-        return_repo: ReturnRepository,
-        cashflow_repo: CashFlowRepository,
-        engine: FinancialEngine,
-    ) -> None:
-        self._sku_repo = sku_repo
-        self._order_repo = order_repo
-        self._return_repo = return_repo
-        self._cashflow_repo = cashflow_repo
-        self._engine = engine
+    sku_repo: SKURepository
+    order_repo: OrderRepository
+    return_repo: ReturnRepository
+    cashflow_repo: CashFlowRepository
+    engine: FinancialEngine
 
     async def execute(
         self, from_date: date, to_date: date
     ) -> DashboardSummaryDTO:
-        skus = await self._sku_repo.find_all()
-        orders = await self._order_repo.find_by_date_range(
-            from_date, to_date
-        )
-        returns = await self._return_repo.find_by_date_range(
-            from_date, to_date
-        )
+        skus = await self.sku_repo.find_all()
+        orders = await self.order_repo.find_by_date_range(from_date, to_date)
+        returns = await self.return_repo.find_by_date_range(from_date, to_date)
 
-        pnl = self._engine.compute_pnl(orders, returns, skus)
+        pnl = self.engine.compute_pnl(orders, returns, skus)
         total_revenue: Decimal = pnl["total_revenue"]
         net_profit: Decimal = pnl["net_profit"]
         total_commissions: Decimal = pnl["total_commissions"]
@@ -73,7 +62,7 @@ class GetDashboardSummaryUseCase:
         )
 
         sku_profits = [
-            self._engine.compute_sku_profit(orders, returns, sku)
+            self.engine.compute_sku_profit(orders, returns, sku)
             for sku in skus
         ]
         top_skus = sorted(
